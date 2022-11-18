@@ -1,0 +1,139 @@
+/** import of AQI raw data - Beijing and Shanghai - 2020 and 2021 **/
+Data BJ2020_Raw_data;
+infile '/home/u58581383/EPG1V2/Group Project/csv source data/Beijing/Beijing_2020_cleaned.csv' dlm =',' firstobs=2 missover dsd;
+     format Temp 5. Site $9. Parameter $17. Date_LT_ DATETIME13. Year 4. Month 2. Day 2. Hour 2. NowCast_Conc 5.1 
+     		AQI 4. AQI_Category $35. Raw_Conc 4. Conc_Unit $5. Duration $4. QC_Name $10.;
+     input Temp Site $ Parameter $ Date_LT_:ANYDTDTM40. Year Month Day Hour NowCast_Conc 
+     	    AQI AQI_Category $ Raw_Conc Conc_Unit $ Duration $ QC_Name $;
+     drop Temp;
+run; 
+
+Data BJ2021_Raw_data;
+infile '/home/u58581383/EPG1V2/Group Project/csv source data/Beijing/Beijing_2021_cleaned.csv' dlm =',' firstobs=2 missover dsd;
+     format Temp 5. Site $9. Parameter $17. Date_LT_ DATETIME13. Year 4. Month 2. Day 2. Hour 2. NowCast_Conc 5.1 
+     		AQI 4. AQI_Category $35. Raw_Conc 4. Conc_Unit $5. Duration $4. QC_Name $10.;
+     input Temp Site $ Parameter $ Date_LT_:ANYDTDTM40. Year Month Day Hour NowCast_Conc 
+     	    AQI AQI_Category $ Raw_Conc Conc_Unit $ Duration $ QC_Name $;
+     drop Temp;
+run; 
+
+Data SH2020_Raw_data;
+infile '/home/u58581383/EPG1V2/Group Project/csv source data/Shanghai/Shanghai_2020_cleaned.csv' dlm =',' firstobs=2 missover dsd;
+     format Temp 5. Site $9. Parameter $17. Date_LT_ DATETIME13. Year 4. Month 2. Day 2. Hour 2. NowCast_Conc 5.1 
+     		AQI 4. AQI_Category $35. Raw_Conc 4. Conc_Unit $5. Duration $4. QC_Name $10.;
+     input Temp Site $ Parameter $ Date_LT_:ANYDTDTM40. Year Month Day Hour NowCast_Conc 
+     	    AQI AQI_Category $ Raw_Conc Conc_Unit $ Duration $ QC_Name $;
+     drop Temp;
+run; 
+
+Data SH2021_Raw_data;
+infile '/home/u58581383/EPG1V2/Group Project/csv source data/Shanghai/Shanghai_2021_cleaned.csv' dlm =',' firstobs=2 missover dsd;
+     format Temp 5. Site $9. Parameter $17. Date_LT_ DATETIME13. Year 4. Month 2. Day 2. Hour 2. NowCast_Conc 5.1 
+     		AQI 4. AQI_Category $35. Raw_Conc 4. Conc_Unit $5. Duration $4. QC_Name $10.;
+     input Temp Site $ Parameter $ Date_LT_:ANYDTDTM40. Year Month Day Hour NowCast_Conc 
+     	    AQI AQI_Category $ Raw_Conc Conc_Unit $ Duration $ QC_Name $;
+     drop Temp;
+run; 
+
+/** Merge of AQI raw data per city **/
+Data BJ202021_Raw_data;
+     set BJ2020_Raw_data BJ2021_Raw_data;
+run;
+
+Data SH202021_Raw_data;
+     set SH2020_Raw_Data SH2021_Raw_Data;
+run;
+
+/** import of COVID confirmed cases and death cases raw data **/
+proc import datafile = "/home/u58581383/EPG1V2/Group Project/csv source data/COVID_Cases/DailyConfirmedCases - BJ and SH.csv"
+     out = confirmed_cases
+     dbms = csv
+     replace;
+run;
+
+proc import datafile = "/home/u58581383/EPG1V2/Group Project/csv source data/COVID_Cases/DailyDeathCases - BJ and SH.csv"
+     out = death_cases
+     dbms = csv
+     replace;
+run;
+
+/** convert the 6 hr records to mean daily record per city, plus conversion of AQI and AQI Category from the calculated mean per city - Beijing **/
+proc means data = BJ202021_Raw_data noprint;
+     output out = BJ202021_Raw_data_daily mean=;
+     var Raw_Conc NowCast_Conc;
+     by Year Month Day Site;
+run;
+
+Data BJ202021_Daily;
+     set BJ202021_Raw_data_daily;
+     format AQI 4. AQI_Category $35.;
+         if NowCast_Conc < 12.1 then AQI = (50 / 12 * (NowCast_Conc - 0)) + 0; 
+	     else if NowCast_Conc LE 35.5 then AQI = (49 / 23.3 * (NowCast_Conc - 12.1)) + 51;
+	     else if NowCast_Conc LE 55.5 then AQI = (49 / 19.9 * (NowCast_Conc - 35.5)) + 101;
+	     else if NowCast_Conc LE 150.5 then AQI = (49 / 94.9 * (NowCast_Conc - 55.5)) + 151;
+	     else if NowCast_Conc LE 250.5 then AQI = (99 / 99.9 * (NowCast_Conc - 150.5)) + 201;
+	     else if NowCast_Conc LE 350.5 then AQI = (99 / 99.9 * (NowCast_Conc - 250.5)) + 301;
+	     else if NowCast_Conc LE 500.4 then AQI = (99 / 149.9 * (NowCast_Conc - 350.5)) + 401;
+	     else AQI = 500;
+	     if NowCast_Conc < 12.1 then AQI_Category = "Good"; 
+	     else if NowCast_Conc LE 35.5 then AQI_Category = "Moderate";
+	     else if NowCast_Conc LE 55.5 then AQI_Category = "Unhealthy for Sensitive People";
+	     else if NowCast_Conc LE 150.5 then AQI_Category = "Unhealthy";
+	     else if NowCast_Conc LE 250.5 then AQI_Category = "Very Unhealthy";
+	     else if NowCast_Conc LE 350.5 then AQI_Category = "Hazardous";
+	     else if NowCast_Conc LE 500.4 then AQI_Category = "Hazardous";
+	     else AQI_Category = "Hazardous";
+	 	 Drop _Type_ _Freq_;
+run;
+
+/** convert the 6 hr records to mean daily record per city, plus conversion of AQI and AQI Category from the calculated mean per city - Shanghai **/
+proc means data = SH202021_Raw_data noprint;
+     output out = SH202021_Raw_data_daily mean=;
+     var Raw_Conc NowCast_Conc;
+     by Year Month Day Site;
+run;
+
+Data SH202021_Daily;
+     set SH202021_Raw_data_daily;
+     format AQI 4. AQI_Category $35.;
+         if NowCast_Conc < 12.1 then AQI = (50 / 12 * (NowCast_Conc - 0)) + 0; 
+	     else if NowCast_Conc LE 35.5 then AQI = (49 / 23.3 * (NowCast_Conc - 12.1)) + 51;
+	     else if NowCast_Conc LE 55.5 then AQI = (49 / 19.9 * (NowCast_Conc - 35.5)) + 101;
+	     else if NowCast_Conc LE 150.5 then AQI = (49 / 94.9 * (NowCast_Conc - 55.5)) + 151;
+	     else if NowCast_Conc LE 250.5 then AQI = (99 / 99.9 * (NowCast_Conc - 150.5)) + 201;
+	     else if NowCast_Conc LE 350.5 then AQI = (99 / 99.9 * (NowCast_Conc - 250.5)) + 301;
+	     else if NowCast_Conc LE 500.4 then AQI = (99 / 149.9 * (NowCast_Conc - 350.5)) + 401;
+	     else AQI = 500;
+	     if NowCast_Conc < 12.1 then AQI_Category = "Good"; 
+	     else if NowCast_Conc LE 35.5 then AQI_Category = "Moderate";
+	     else if NowCast_Conc LE 55.5 then AQI_Category = "Unhealthy for Sensitive People";
+	     else if NowCast_Conc LE 150.5 then AQI_Category = "Unhealthy";
+	     else if NowCast_Conc LE 250.5 then AQI_Category = "Very Unhealthy";
+	     else if NowCast_Conc LE 350.5 then AQI_Category = "Hazardous";
+	     else if NowCast_Conc LE 500.4 then AQI_Category = "Hazardous";
+	     else AQI_Category = "Hazardous";
+	 	 Drop _Type_ _Freq_;
+run;
+
+/** Inner Join merging of AQI record + confirmed case + death case per city - Beijing **/
+data BJ2021;
+     merge BJ202021_Daily (in=a) confirmed_cases (in=b) death_cases (in=c);
+     By Year Month Day;
+     if a and b and c;
+     rename Beijing_confirmed=COVID_Confirmed Beijing_death=COVID_death;
+     Drop Shanghai_confirmed Shanghai_Death;
+run;
+
+/** Inner Join merging of AQI record + confirmed case + death case per city - Shanghai **/
+data SH2021;
+     merge SH202021_Daily (in=a) confirmed_cases (in=b) death_cases (in=c);
+     By Year Month Day;
+     if a and b and c;
+     rename Shanghai_confirmed=COVID_Confirmed Shanghai_death=COVID_death;
+     Drop Beijing_confirmed Beijing_Death;
+run;
+
+/** Combine the final dataset **/
+data BJSH2021;
+     set BJ2021 SH2021;
+run;
